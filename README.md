@@ -73,16 +73,73 @@ Skipped 'Grooming' for Rex — not enough time remaining.
 
 ```bash
 # Run the full test suite:
-pytest
+python3 -m pytest
 
-# Run with coverage:
-pytest --cov
+# Coverage for the whole project, terminal summary
+python -m pytest --cov=. tests/
+
+# Just the module under test, showing which lines are missed
+python -m pytest --cov=pawpal_system --cov-report=term-missing tests/
+
 ```
+
+Confidence Level in the system's reliability based on the test results: 5 stars
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+$ python3 -m pytest
+================================================================== test session starts ==================================================================
+platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
+rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
+plugins: cov-5.0.0
+collected 26 items                                                                                                                                      
+
+tests/test_pawpal.py ..........................                                                                                                   [100%]
+
+================================================================== 26 passed in 0.06s ===================================================================
+
+$ python -m pytest --cov=. tests/
+================================================================== test session starts ==================================================================
+platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
+rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
+plugins: cov-5.0.0
+collected 26 items                                                                                                                                      
+
+tests/test_pawpal.py ..........................                                                                                                   [100%]
+
+---------- coverage: platform darwin, python 3.8.17-final-0 ----------
+Name                   Stmts   Miss  Cover
+------------------------------------------
+app.py                    36     36     0%
+main.py                   59     59     0%
+pawpal_system.py         118      0   100%
+tests/test_pawpal.py     175      0   100%
+------------------------------------------
+TOTAL                    388     95    76%
+
+
+================================================================== 26 passed in 0.23s ===================================================================
+
+$ python -m pytest --cov=pawpal_system --cov-report=term-missing tests/
+
+================================================================== test session starts ==================================================================
+platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
+rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
+plugins: cov-5.0.0
+collected 26 items                                                                                                                                      
+
+tests/test_pawpal.py ..........................                                                                                                   [100%]
+
+---------- coverage: platform darwin, python 3.8.17-final-0 ----------
+Name               Stmts   Miss  Cover   Missing
+------------------------------------------------
+pawpal_system.py     118      0   100%
+------------------------------------------------
+TOTAL                118      0   100%
+
+
+================================================================== 26 passed in 0.13s ===================================================================
 ```
 
 ## 📐 Smarter Scheduling

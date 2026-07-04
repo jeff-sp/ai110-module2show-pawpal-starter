@@ -107,3 +107,214 @@ def test_task_addition():
     rex.add_task(Task("Feed", duration_minutes=10, priority=5))
 
     assert len(rex.tasks) == 1
+
+
+# --- Recurrence edge cases -------------------------------------------------
+
+def test_weekly_recurrence_advances_seven_days():
+    """Completing a weekly task should queue one due seven days later."""
+    rex = Pet(name="Rex", species="dog")
+    bath = Task("Bath", duration_minutes=20, priority=2,
+                frequency="weekly", due=date(2026, 7, 4))
+    rex.add_task(bath)
+
+    bath.mark_task_complete()
+
+    assert len(rex.tasks) == 2
+    assert rex.tasks[-1].due == date(2026, 7, 11)
+
+
+def test_recurrence_anchors_to_due_not_today():
+    """next_occurrence advances from the task's own due date, even if late."""
+    walk = Task("Walk", duration_minutes=30, priority=5,
+                frequency="daily", due=date(2000, 1, 1))
+
+    upcoming = walk.next_occurrence()
+
+    assert upcoming.due == date(2000, 1, 2)  # not tomorrow relative to today
+
+
+def test_next_occurrence_none_for_non_recurring():
+    """A non-recurring task has no next occurrence."""
+    groom = Task("Grooming", duration_minutes=40, priority=1, frequency="once")
+
+    assert groom.next_occurrence() is None
+
+
+# --- sort_by_time ----------------------------------------------------------
+
+def test_sort_by_time_orders_earliest_first():
+    """sort_by_time returns tasks ordered by start time, earliest first."""
+    scheduler = Scheduler()
+    late = Task("Play", 15, 3, time="17:00")
+    early = Task("Walk", 30, 5, time="07:30")
+    mid = Task("Feed", 10, 5, time="12:15")
+
+    ordered = scheduler.sort_by_time([late, early, mid])
+
+    assert ordered == [early, mid, late]
+
+
+# --- Conflict boundaries ---------------------------------------------------
+
+def test_same_start_time_conflicts():
+    """Two tasks at the exact same start time overlap and are returned as a pair."""
+    scheduler = Scheduler()
+    d = date(2026, 7, 4)
+    walk = Task("Walk", 30, 5, time="07:30", due=d)
+    meds = Task("Medicine", 5, 5, time="07:30", due=d)
+
+    assert scheduler.detect_conflicts([walk, meds]) == [(walk, meds)]
+
+
+def test_adjacent_tasks_do_not_conflict():
+    """Back-to-back tasks (half-open intervals) must not be flagged."""
+    scheduler = Scheduler()
+    d = date(2026, 7, 4)
+    walk = Task("Walk", 30, 5, time="07:30", due=d)   # 07:30-08:00
+    feed = Task("Feed", 15, 5, time="08:00", due=d)    # 08:00-08:15
+
+    assert scheduler.detect_conflicts([walk, feed]) == []
+
+
+# --- filter_tasks ----------------------------------------------------------
+
+def test_filter_by_completion_status():
+    """filter_tasks(completed=...) returns only tasks with that status."""
+    scheduler = Scheduler()
+    done = Task("Walk", 30, 5, completed=True)
+    todo = Task("Feed", 10, 5, completed=False)
+
+    assert scheduler.filter_tasks([done, todo], completed=False) == [todo]
+    assert scheduler.filter_tasks([done, todo], completed=True) == [done]
+
+
+def test_filter_by_pet_name_is_case_insensitive():
+    """Pet-name filtering matches regardless of case."""
+    scheduler = Scheduler()
+    rex = Pet(name="Rex", species="dog")
+    mia = Pet(name="Mia", species="cat")
+    rex.add_task(Task("Walk", 30, 5))
+    mia.add_task(Task("Feed", 10, 5))
+
+    result = scheduler.filter_tasks(rex.tasks + mia.tasks, pet_name="rEx")
+
+    assert len(result) == 1 and result[0].pet is rex
+
+
+def test_filter_with_no_criteria_returns_all():
+    """Omitting both filters returns the full list unchanged."""
+    scheduler = Scheduler()
+    tasks = [Task("Walk", 30, 5), Task("Feed", 10, 5)]
+
+    assert scheduler.filter_tasks(tasks) == tasks
+
+
+# --- generate_schedule -----------------------------------------------------
+
+def _owner_with(available, *tasks):
+    owner = Owner(name="Sam", available_time_minutes=available)
+    pet = Pet(name="Rex", species="dog")
+    for t in tasks:
+        pet.add_task(t)
+    owner.add_pet(pet)
+    return owner
+
+
+def test_generate_schedule_fits_everything():
+    """When everything fits, all tasks are scheduled and none skipped."""
+    scheduler = Scheduler()
+    owner = _owner_with(
+        60,
+        Task("Walk", 30, 5, time="07:00"),
+        Task("Feed", 10, 5, time="08:00"),
+    )
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert len(plan.scheduled) == 2
+    assert plan.skipped == []
+
+
+def test_generate_schedule_skips_by_priority():
+    """When over budget, lower-priority tasks are skipped."""
+    scheduler = Scheduler()
+    high = Task("Meds", 30, 9, time="08:00")
+    low = Task("Play", 30, 1, time="17:00")
+    owner = _owner_with(30, high, low)
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == [high]
+    assert plan.skipped == [low]
+
+
+def test_generate_schedule_output_is_chronological():
+    """Scheduled tasks are returned in time order, not priority order."""
+    scheduler = Scheduler()
+    later_high = Task("Meds", 10, 9, time="18:00")
+    earlier_low = Task("Walk", 10, 1, time="06:00")
+    owner = _owner_with(60, later_high, earlier_low)
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == [earlier_low, later_high]
+
+
+def test_generate_schedule_priority_tie_breaks_on_duration():
+    """Equal priority: the shorter task wins the last available slot."""
+    scheduler = Scheduler()
+    short = Task("Feed", 10, 5, time="08:00")
+    long = Task("Walk", 30, 5, time="09:00")
+    owner = _owner_with(10, short, long)  # only room for one
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == [short]
+    assert plan.skipped == [long]
+
+
+def test_generate_schedule_exact_fit_is_inclusive():
+    """A task exactly filling the remaining time should be scheduled."""
+    scheduler = Scheduler()
+    owner = _owner_with(30, Task("Walk", 30, 5, time="07:00"))
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert len(plan.scheduled) == 1
+    assert plan.skipped == []
+
+
+def test_generate_schedule_excludes_completed_tasks():
+    """Already-completed tasks are not part of the generated plan."""
+    scheduler = Scheduler()
+    done = Task("Walk", 30, 5, time="07:00", completed=True)
+    todo = Task("Feed", 10, 5, time="08:00")
+    owner = _owner_with(60, done, todo)
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == [todo]
+
+
+def test_generate_schedule_empty_owner():
+    """An owner with no pets/tasks yields an empty plan with a clear rationale."""
+    scheduler = Scheduler()
+    owner = Owner(name="Sam", available_time_minutes=60)
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == []
+    assert plan.skipped == []
+    assert plan.rationale == "No tasks to schedule."
+
+
+def test_generate_schedule_zero_available_time():
+    """With zero available time, every task is skipped and nothing crashes."""
+    scheduler = Scheduler()
+    owner = _owner_with(0, Task("Walk", 30, 5), Task("Feed", 10, 5))
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert plan.scheduled == []
+    assert len(plan.skipped) == 2
