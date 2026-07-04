@@ -38,12 +38,18 @@ Yes
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+
 - How did you decide which constraints mattered most?
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+Lost guaranteed O(n²). The old version sorted by start time and breaked out of the the inner loop as soon as a task started after the current one ended. In a typical day (tasks spread across morning/afternoon/evening), that made most comparisons stop early — closer to linear in practice. The combinations version always checks all n(n−1)/2 pairs, with no shortcut.
+
+What we gained — clarity and a reusable predicate. The overlap rule now lives in one named, independently testable method (_overlaps), and detect_conflicts is a single readable comprehension. No index arithmetic, no list-slice copies.
+
 - Why is that tradeoff reasonable for this scenario?
+Why the trade is worth it here: n is a pet owner's daily task list — a handful of items, maybe a few dozen. At that scale the difference between "early break" and "all pairs" is microseconds, invisible to the user. Meanwhile the code is read and maintained far more often than it runs, so readability is the higher-value asset.
 
 ---
 

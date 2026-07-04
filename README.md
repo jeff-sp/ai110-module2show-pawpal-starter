@@ -87,14 +87,61 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+Beyond the basic priority-greedy plan in `Scheduler.generate_schedule()`, PawPal+
+adds several small algorithms that make the daily plan more realistic for a pet
+owner. Each feature and the method that implements it:
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()` | Orders tasks chronologically by their `"HH:MM"` start time so the plan reads as a real day. Selection still happens by priority; this only reorders the final plan. |
+| Filtering | `Scheduler.filter_tasks()` | Returns tasks matching a completion status and/or pet name. Both filters are optional; pet-name matching is case-insensitive. |
+| Conflict detection | `Scheduler.detect_conflicts()`, `Scheduler.check_conflicts()`, `Scheduler._overlaps()` | Flags tasks whose time slots overlap on the same day (across pets, not just within one). |
+| Recurring tasks | `Task.mark_task_complete()`, `Task.next_occurrence()` | Completing a `"daily"` or `"weekly"` task auto-creates its next occurrence. |
+
+### Sorting behavior — `Scheduler.sort_by_time()`
+
+Each `Task` carries a `time` field (`"HH:MM"`, 24-hour). `sort_by_time()` returns
+the tasks ordered earliest-first, using the shared `_start_minutes()` helper to
+convert `"HH:MM"` into minutes past midnight (so unpadded times like `"9:30"`
+still sort correctly). `generate_schedule()` selects tasks by priority to fill
+the time budget, then calls `sort_by_time()` so the printed plan is chronological.
+
+### Filtering behavior — `Scheduler.filter_tasks()`
+
+`filter_tasks(tasks, completed=None, pet_name=None)` narrows a task list:
+
+- `completed=True` / `completed=False` filters by completion status (`None` ignores it).
+- `pet_name="rex"` returns only that pet's tasks, matched case-insensitively.
+- Passing both combines them (e.g. "Milo's incomplete tasks").
+
+The demo uses `filter_tasks(owner.all_tasks(), completed=True)` to print an
+"Already done today" section.
+
+### Conflict detection — `Scheduler.detect_conflicts()` / `check_conflicts()`
+
+Each task occupies the half-open interval `[start, start + duration)`.
+`_overlaps()` is the core predicate: two tasks conflict when they share a due
+date and each starts before the other ends (identical start times count).
+
+- `detect_conflicts()` returns the overlapping **pairs** (earliest first), using
+  `itertools.combinations` over the time-sorted list.
+- `check_conflicts()` is the **lightweight** wrapper: it returns a human-readable
+  warning string (empty when there are none) and never raises — tasks with a
+  malformed time are skipped and noted rather than crashing the program.
+
+Conflicts are detected across different pets, not just within one pet.
+
+### Recurring task logic — `Task.mark_task_complete()` / `next_occurrence()`
+
+Marking a recurring task complete queues up its next instance automatically:
+
+- `next_occurrence()` builds a fresh, uncompleted copy for `"daily"` or
+  `"weekly"` tasks (returns `None` otherwise), advancing the `due` date with
+  `timedelta(days=1)` / `timedelta(weeks=1)`. The delta is added to the task's
+  **own** due date so the cadence stays anchored even if completed late, and
+  `timedelta` handles month/year/leap-year rollovers correctly.
+- `mark_task_complete()` marks the task done and attaches the new occurrence to
+  the same pet.
 
 ## 📸 Demo Walkthrough
 
