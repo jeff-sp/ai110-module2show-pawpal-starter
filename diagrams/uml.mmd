@@ -1,7 +1,13 @@
 classDiagram
     class Scheduler {
-        +generate_schedule(owner Owner, pet Pet, tasks list~Task~) list~Task~
-        +explain_plan(plan list~Task~) str
+        +generate_schedule(owner Owner) Plan
+        +explain_plan(plan Plan) str
+    }
+
+    class Plan {
+        +list~Task~ scheduled
+        +list~Task~ skipped
+        +str rationale
     }
 
     class Owner {
@@ -10,22 +16,30 @@ classDiagram
         +dict preferences
         +list~Pet~ pets
         +add_pet(pet Pet) None
+        +all_tasks() list~Task~
     }
 
     class Pet {
         +str name
         +str species
+        +list~Task~ tasks
+        +add_task(task Task) None
     }
 
     class Task {
-        +str title
+        +str description
         +int duration_minutes
         +int priority
+        +str frequency
+        +bool completed
+        +Pet pet
+        +mark_done() None
     }
 
     Owner "1" --> "*" Pet : owns
-    Owner ..> Scheduler : requests plan
-    Scheduler ..> Owner : reads constraints
-    Scheduler ..> Pet : reads
-    Scheduler ..> Task : plans
+    Pet "1" --> "*" Task : has
     Task "*" --> "1" Pet : belongs to
+    Owner ..> Scheduler : requests plan
+    Scheduler ..> Owner : reads tasks and constraints
+    Scheduler ..> Plan : produces
+    Plan "1" --> "*" Task : contains

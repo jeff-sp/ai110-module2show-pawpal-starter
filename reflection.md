@@ -26,8 +26,11 @@ Task has (string) title, (integer) durtaion_in_minutes, and (integer) priority.
 **b. Design changes**
 
 - Did your design change during implementation?
+Yes
 - If yes, describe at least one change and why you made it.
-
+1. Changed `def generate_schedule(self, owner: Owner, pet: Pet, tasks: list[Task]) -> list[Task]:` to `def generate_schedule(self, owner: Owner, tasks: list[Task]) -> list[Task]:` because an Owner owns `list[Pet]`, and each Task already references its own pet. So passing one `pet` is both redundant (it's on the Task) and too narrow (a daily plan should cover all the owner's lets). The scheduler gets pets via `task.pet` or `owner.pets`, no separate `pet` param needed.
+2. `generate_schedule` returns `list[Task]` and `explain_plan` takes `list[Task]`. But therequirement says the assistant must "produce a daily plan and explain why." A bare list can't hold the reasoning, scheduled times, or which tasks were dropped for lack of time. Consider a `Plan` dataclass with attributes (list[Task]) scheduled, (list[Task]) skipped, and (string) rationale. Now `explain_plan(plan: Plan)` has something to explain. Right now the "explain why" behavior has no data to draw on.
+3. `preferences: dict` is untyled. `dict` loses all structure so the scheduler won't know what keys exist ("preferred_walk_time"? "skip_grooming"?). Fine for a skeleton, but it'll become a source of KeyErrors. A small dataclass or documented keys would help once you know what constraints matter.
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
