@@ -169,13 +169,34 @@ class Scheduler:
             result = [t for t in result if t.pet and t.pet.name.lower() == target]
         return result
 
+    def _fairness_ranks(self, tasks: list[Task]) -> dict[int, int]:
+        """Rank each task within its own pet (0 = that pet's most important task).
+
+        Ordering within a pet is highest priority first, then shortest duration.
+        These ranks let generate_schedule interleave pets round-robin so no single
+        pet's tasks are all served before another pet gets a turn.
+        """
+        by_pet: dict[int, list[Task]] = {}
+        for task in tasks:
+            by_pet.setdefault(id(task.pet), []).append(task)
+
+        ranks: dict[int, int] = {}
+        for pet_tasks in by_pet.values():
+            ordered = sorted(pet_tasks, key=lambda t: (-t.priority, t.duration_minutes))
+            for rank, task in enumerate(ordered):
+                ranks[id(task)] = rank
+        return ranks
+
     def generate_schedule(self, owner: Owner) -> Plan:
         """Build a daily plan that fits the owner's tasks into their available time."""
         # Retrieve every task from all of the owner's pets.
         tasks = [t for t in owner.all_tasks() if not t.completed]
 
-        # Organize: highest priority first, then shortest task to fit more in.
-        tasks.sort(key=lambda t: (-t.priority, t.duration_minutes))
+        # Organize fairly: round-robin across pets (each pet's Nth-ranked task
+        # together), then highest priority first, then shortest task to fit more in.
+        # The leading rank keeps one pet from monopolizing the whole time budget.
+        ranks = self._fairness_ranks(tasks)
+        tasks.sort(key=lambda t: (ranks[id(t)], -t.priority, t.duration_minutes))
 
         scheduled: list[Task] = []
         skipped: list[Task] = []

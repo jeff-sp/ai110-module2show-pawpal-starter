@@ -318,3 +318,68 @@ def test_generate_schedule_zero_available_time():
 
     assert plan.scheduled == []
     assert len(plan.skipped) == 2
+
+
+# --- Multi-pet fairness ----------------------------------------------------
+
+def _two_pet_owner(available, pet_a_tasks, pet_b_tasks):
+    """Owner with two pets; each argument is a list of Tasks for that pet."""
+    owner = Owner(name="Jordan", available_time_minutes=available)
+    a = Pet(name="Mochi", species="cat")
+    b = Pet(name="Rex", species="dog")
+    for t in pet_a_tasks:
+        a.add_task(t)
+    for t in pet_b_tasks:
+        b.add_task(t)
+    owner.add_pet(a)
+    owner.add_pet(b)
+    return owner
+
+
+def test_generate_schedule_shares_budget_across_pets():
+    """Equal priority/duration: a tight budget is split evenly, not hogged by one pet.
+
+    Regression test for the bug where all of the first-added pet's tasks were
+    scheduled before any of the second pet's got a turn.
+    """
+    scheduler = Scheduler()
+    mochi = [Task(f"M{i}", 20, 5, time=f"{7 + i:02d}:00") for i in range(5)]
+    rex = [Task(f"R{i}", 20, 5, time=f"{7 + i:02d}:30") for i in range(4)]
+    owner = _two_pet_owner(120, mochi, rex)  # room for 6 of the 9 tasks
+
+    plan = scheduler.generate_schedule(owner)
+
+    assert len(plan.scheduled) == 6
+    per_pet = {"Mochi": 0, "Rex": 0}
+    for task in plan.scheduled:
+        per_pet[task.pet.name] += 1
+    assert per_pet == {"Mochi": 3, "Rex": 3}
+
+
+def test_fairness_serves_each_pets_top_task_first():
+    """Each pet's most important task is scheduled before any pet's second task."""
+    scheduler = Scheduler()
+    # Mochi's two tasks would consume the whole budget under a naive sort.
+    mochi = [Task("M-top", 20, 5, time="07:00"), Task("M-second", 20, 5, time="08:00")]
+    rex = [Task("R-top", 20, 5, time="07:30")]
+    owner = _two_pet_owner(40, mochi, rex)  # room for only 2 tasks
+
+    plan = scheduler.generate_schedule(owner)
+
+    names = {t.description for t in plan.scheduled}
+    assert names == {"M-top", "R-top"}
+    assert plan.skipped[0].description == "M-second"
+
+
+def test_fairness_still_respects_priority_within_a_round():
+    """Within a pet, its higher-priority task is ranked first for its turn."""
+    scheduler = Scheduler()
+    mochi = [Task("M-low", 20, 1, time="09:00"), Task("M-high", 20, 9, time="08:00")]
+    rex = [Task("R-mid", 20, 5, time="07:30")]
+    owner = _two_pet_owner(40, mochi, rex)  # room for 2 tasks
+
+    plan = scheduler.generate_schedule(owner)
+
+    names = {t.description for t in plan.scheduled}
+    # Mochi's slot goes to its high-priority task, not its low one.
+    assert "M-high" in names and "M-low" not in names

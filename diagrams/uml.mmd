@@ -1,7 +1,14 @@
 classDiagram
     class Scheduler {
+        +sort_by_time(tasks list~Task~) list~Task~
+        +detect_conflicts(tasks list~Task~) list~tuple~
+        +check_conflicts(tasks list~Task~) str
+        +filter_tasks(tasks list~Task~, completed bool, pet_name str) list~Task~
         +generate_schedule(owner Owner) Plan
         +explain_plan(plan Plan) str
+        -_start_minutes(task Task) int
+        -_has_valid_time(task Task) bool
+        -_overlaps(a Task, b Task) bool
     }
 
     class Plan {
@@ -30,16 +37,22 @@ classDiagram
         +str description
         +int duration_minutes
         +int priority
+        +str time
         +str frequency
+        +date due
         +bool completed
         +Pet pet
-        +mark_done() None
+        +next_occurrence() Task
+        +mark_task_complete() None
     }
 
     Owner "1" --> "*" Pet : owns
     Pet "1" --> "*" Task : has
     Task "*" --> "1" Pet : belongs to
+    Task ..> Pet : re-queues next occurrence
+    Task ..> Task : creates next occurrence
     Owner ..> Scheduler : requests plan
     Scheduler ..> Owner : reads tasks and constraints
     Scheduler ..> Plan : produces
+    Scheduler ..> Task : sorts / filters / checks
     Plan "1" --> "*" Task : contains

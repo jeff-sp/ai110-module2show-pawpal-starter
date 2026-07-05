@@ -12,6 +12,26 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 
 Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
 
+## ✨ Features
+
+The implemented algorithms (all in `pawpal_system.py`, detailed under
+[Smarter Scheduling](#-smarter-scheduling)):
+
+- **Priority-greedy planning** — fills the day's time budget highest-priority-first,
+  shortest-task-first, and reports what couldn't fit (`generate_schedule`).
+- **Fair multi-pet scheduling** — round-robins across pets so a tight budget is
+  shared, not monopolized by whichever pet was added first (`_fairness_ranks`).
+- **Sorting by time** — orders the final plan chronologically by each task's
+  `"HH:MM"` start time (`sort_by_time`).
+- **Conflict warnings** — flags overlapping time slots (across pets) and returns a
+  human-readable, crash-safe warning string (`detect_conflicts`, `check_conflicts`).
+- **Filtering** — narrows tasks by completion status and/or pet name, case-insensitively
+  (`filter_tasks`).
+- **Daily / weekly recurrence** — completing a recurring task auto-queues its next
+  occurrence with the due date advanced (`mark_task_complete`, `next_occurrence`).
+- **Plan explanation** — generates a line-by-line rationale of what was scheduled
+  and what was skipped (`explain_plan`).
+
 ## What you will build
 
 Your final app should:
@@ -45,28 +65,58 @@ pip install -r requirements.txt
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+```
+========================================
+Insertion order (as added):
+========================================
+  14:00 Grooming — Rex
+  07:30 Morning walk — Rex
+  17:00 Play / enrichment — Milo
+  08:00 Feed — Milo
+  07:30 Medicine — Milo
+  08:00 Feed — Milo
+
+========================================
+After sort_by_time (chronological):
+========================================
+  07:30 Morning walk — Rex
+  07:30 Medicine — Milo
+  08:00 Feed — Milo
+  08:00 Feed — Milo
+  14:00 Grooming — Rex
+  17:00 Play / enrichment — Milo
+
+========================================
+filter_tasks demos:
+========================================
+  Rex's tasks: ['Grooming', 'Morning walk']
+  Completed:   ['Feed']
+  Incomplete:  ['Grooming', 'Morning walk', 'Play / enrichment', 'Medicine', 'Feed']
+
+========================================
 Today's Schedule for Sam
 (available time: 60 min)
 ========================================
-  [ ] Feed — Milo (10 min)
-  [ ] Morning walk — Rex (30 min)
-  [ ] Play / enrichment — Milo (15 min)
+  [ ] 2026-07-04 07:30 Medicine — Milo (5 min)
+  [ ] 2026-07-04 07:30 Morning walk — Rex (30 min)
+  [ ] 2026-07-05 08:00 Feed — Milo (10 min)
+  [ ] 2026-07-04 17:00 Play / enrichment — Milo (15 min)
 
 Couldn't fit today:
-  - Grooming — Rex (40 min)
+  - 14:00 Grooming — Rex (40 min)
+
+Already done today:
+  [x] 08:00 Feed — Milo (10 min)
+
+⚠ Scheduling conflicts (overlapping times):
+  07:30 Medicine (Milo) overlaps 07:30 Morning walk (Rex)
 
 Why this plan:
-Scheduled 'Feed' for Milo (10 min, priority 5).
+Scheduled 'Medicine' for Milo (5 min, priority 5).
 Scheduled 'Morning walk' for Rex (30 min, priority 5).
+Scheduled 'Feed' for Milo (10 min, priority 5).
 Scheduled 'Play / enrichment' for Milo (15 min, priority 3).
 Skipped 'Grooming' for Rex — not enough time remaining.
-
-```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
 ```
 
 ## 🧪 Testing PawPal+
@@ -88,58 +138,57 @@ Confidence Level in the system's reliability based on the test results: 5 stars
 Sample test output:
 
 ```
-$ python3 -m pytest
+$ python3 -m pytest              
 ================================================================== test session starts ==================================================================
 platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
 rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
 plugins: cov-5.0.0
-collected 26 items                                                                                                                                      
+collected 29 items                                                                                                                                      
 
-tests/test_pawpal.py ..........................                                                                                                   [100%]
+tests/test_pawpal.py .............................                                                                                                [100%]
 
-================================================================== 26 passed in 0.06s ===================================================================
+================================================================== 29 passed in 0.08s ===================================================================
 
 $ python -m pytest --cov=. tests/
 ================================================================== test session starts ==================================================================
 platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
 rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
 plugins: cov-5.0.0
-collected 26 items                                                                                                                                      
+collected 29 items                                                                                                                                      
 
-tests/test_pawpal.py ..........................                                                                                                   [100%]
+tests/test_pawpal.py .............................                                                                                                [100%]
 
 ---------- coverage: platform darwin, python 3.8.17-final-0 ----------
 Name                   Stmts   Miss  Cover
 ------------------------------------------
-app.py                    36     36     0%
+app.py                   122    122     0%
 main.py                   59     59     0%
-pawpal_system.py         118      0   100%
-tests/test_pawpal.py     175      0   100%
+pawpal_system.py         129      0   100%
+tests/test_pawpal.py     214      0   100%
 ------------------------------------------
-TOTAL                    388     95    76%
+TOTAL                    524    181    65%
 
 
-================================================================== 26 passed in 0.23s ===================================================================
+================================================================== 29 passed in 0.23s ===================================================================
 
 $ python -m pytest --cov=pawpal_system --cov-report=term-missing tests/
-
 ================================================================== test session starts ==================================================================
 platform darwin -- Python 3.8.17, pytest-8.3.5, pluggy-1.5.0
 rootdir: /Users/jeffsanpedro/codepath/AI110/ai110-module2show-pawpal-starter
 plugins: cov-5.0.0
-collected 26 items                                                                                                                                      
+collected 29 items                                                                                                                                      
 
-tests/test_pawpal.py ..........................                                                                                                   [100%]
+tests/test_pawpal.py .............................                                                                                                [100%]
 
 ---------- coverage: platform darwin, python 3.8.17-final-0 ----------
 Name               Stmts   Miss  Cover   Missing
 ------------------------------------------------
-pawpal_system.py     118      0   100%
+pawpal_system.py     129      0   100%
 ------------------------------------------------
-TOTAL                118      0   100%
+TOTAL                129      0   100%
 
 
-================================================================== 26 passed in 0.13s ===================================================================
+================================================================== 29 passed in 0.14s ===================================================================
 ```
 
 ## 📐 Smarter Scheduling
@@ -150,18 +199,39 @@ owner. Each feature and the method that implements it:
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | `Scheduler.sort_by_time()` | Orders tasks chronologically by their `"HH:MM"` start time so the plan reads as a real day. Selection still happens by priority; this only reorders the final plan. |
+| Fair multi-pet scheduling | `Scheduler.generate_schedule()`, `Scheduler._fairness_ranks()` | Round-robins across pets so a tight time budget is shared instead of being consumed entirely by whichever pet was added first. |
+| Task sorting | `Scheduler.sort_by_time()` | Orders tasks chronologically by their `"HH:MM"` start time so the plan reads as a real day. Selection happens by fairness + priority; this only reorders the final plan. |
 | Filtering | `Scheduler.filter_tasks()` | Returns tasks matching a completion status and/or pet name. Both filters are optional; pet-name matching is case-insensitive. |
 | Conflict detection | `Scheduler.detect_conflicts()`, `Scheduler.check_conflicts()`, `Scheduler._overlaps()` | Flags tasks whose time slots overlap on the same day (across pets, not just within one). |
 | Recurring tasks | `Task.mark_task_complete()`, `Task.next_occurrence()` | Completing a `"daily"` or `"weekly"` task auto-creates its next occurrence. |
+
+### Fair multi-pet scheduling — `Scheduler.generate_schedule()` / `_fairness_ranks()`
+
+When several pets compete for a limited time budget, a naive "highest priority,
+then shortest" sort lets ties fall back to insertion order — so every task of the
+first-added pet gets scheduled before any task of the second. `generate_schedule()`
+avoids this by **round-robining across pets**:
+
+- `_fairness_ranks()` ranks each task **within its own pet** (`0` = that pet's most
+  important task), ordered by priority (highest first) then duration (shortest first).
+- `generate_schedule()` then sorts by `(rank, -priority, duration_minutes)`. The
+  leading `rank` means every pet's #1 task is considered before any pet's #2, so
+  the budget is split fairly. Within a single round, `-priority` still wins and
+  `duration` breaks remaining ties.
+- The greedy fill and final `sort_by_time()` are unchanged; only the selection
+  order is fairer.
+
+This is *fairness-first within each round*: a pet's most important task outranks
+another pet's second task even if that second task has higher priority.
 
 ### Sorting behavior — `Scheduler.sort_by_time()`
 
 Each `Task` carries a `time` field (`"HH:MM"`, 24-hour). `sort_by_time()` returns
 the tasks ordered earliest-first, using the shared `_start_minutes()` helper to
 convert `"HH:MM"` into minutes past midnight (so unpadded times like `"9:30"`
-still sort correctly). `generate_schedule()` selects tasks by priority to fill
-the time budget, then calls `sort_by_time()` so the printed plan is chronological.
+still sort correctly). `generate_schedule()` selects tasks by fairness + priority
+to fill the time budget, then calls `sort_by_time()` so the printed plan is
+chronological.
 
 ### Filtering behavior — `Scheduler.filter_tasks()`
 
@@ -202,12 +272,97 @@ Marking a recurring task complete queues up its next instance automatically:
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### Main UI features
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+Launch the app with `streamlit run app.py`. The page is organized top to bottom:
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+- **Owner** — set the owner's name and the total time available for pet care today
+  (the budget the scheduler fits tasks into).
+- **Pets** — maintain a list of pets. Add a pet by name + species; duplicate and
+  blank names are rejected. Each pet must exist before you can assign tasks to it.
+- **Tasks** — add a task with a title, duration, start time (`HH:MM`), priority
+  (low / medium / high), and **which pet it belongs to**. Added tasks appear in a
+  table; "Clear tasks" empties the list.
+- **Build Schedule** — press **Generate schedule** to run the `Scheduler`. Results
+  show time-conflict warnings, an overview (scheduled / skipped / time used), the
+  chronological plan, any tasks that couldn't fit, and an expandable rationale.
+
+### Example workflow
+
+1. Enter the owner (e.g. *Jordan*, 120 minutes available).
+2. Add two pets — *Mochi* (cat) and *Rex* (dog).
+3. Add tasks and assign each to a pet: *Morning walk* for Mochi at `07:30`,
+   *Morning walk* for Rex at `07:30`, *breakfast* for each, and so on.
+4. Press **Generate schedule**.
+5. Review the results: overlapping tasks are flagged, the plan lists what fits in
+   time order, and the leftovers appear under "Couldn't fit today."
+
+### Key Scheduler behaviors on display
+
+- **Fair multi-pet scheduling** — with a tight budget, slots are split evenly
+  across pets rather than being consumed by whichever pet was added first.
+- **Sorting by time** — the final plan is chronological even though tasks are
+  *selected* by priority.
+- **Conflict warnings** — each overlapping pair (across pets) is shown as its own
+  warning with start–end ranges and a suggested fix.
+- **Priority-based fit** — when everything won't fit, lower-priority tasks are the
+  ones skipped, and the rationale explains why.
+
+### Sample CLI output
+
+The same core logic runs headless via `python main.py`, which exercises sorting,
+filtering, scheduling, conflict detection, and recurrence:
+
+```
+========================================
+Insertion order (as added):
+========================================
+  14:00 Grooming — Rex
+  07:30 Morning walk — Rex
+  17:00 Play / enrichment — Milo
+  08:00 Feed — Milo
+  07:30 Medicine — Milo
+  08:00 Feed — Milo
+
+========================================
+After sort_by_time (chronological):
+========================================
+  07:30 Morning walk — Rex
+  07:30 Medicine — Milo
+  08:00 Feed — Milo
+  08:00 Feed — Milo
+  14:00 Grooming — Rex
+  17:00 Play / enrichment — Milo
+
+========================================
+filter_tasks demos:
+========================================
+  Rex's tasks: ['Grooming', 'Morning walk']
+  Completed:   ['Feed']
+  Incomplete:  ['Grooming', 'Morning walk', 'Play / enrichment', 'Medicine', 'Feed']
+
+========================================
+Today's Schedule for Sam
+(available time: 60 min)
+========================================
+  [ ] 2026-07-04 07:30 Medicine — Milo (5 min)
+  [ ] 2026-07-04 07:30 Morning walk — Rex (30 min)
+  [ ] 2026-07-05 08:00 Feed — Milo (10 min)
+  [ ] 2026-07-04 17:00 Play / enrichment — Milo (15 min)
+
+Couldn't fit today:
+  - 14:00 Grooming — Rex (40 min)
+
+Already done today:
+  [x] 08:00 Feed — Milo (10 min)
+
+⚠ Scheduling conflicts (overlapping times):
+  07:30 Medicine (Milo) overlaps 07:30 Morning walk (Rex)
+
+Why this plan:
+Scheduled 'Medicine' for Milo (5 min, priority 5).
+Scheduled 'Morning walk' for Rex (30 min, priority 5).
+Scheduled 'Feed' for Milo (10 min, priority 5).
+Scheduled 'Play / enrichment' for Milo (15 min, priority 3).
+Skipped 'Grooming' for Rex — not enough time remaining.
+```
